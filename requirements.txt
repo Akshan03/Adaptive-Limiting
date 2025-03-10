@@ -1,0 +1,35 @@
+# API Framework
+fastapi
+uvicorn
+pydantic
+starlette
+
+# Machine Learning
+tensorflow
+scikit-learn
+numpy
+pandas
+
+# Data Generation
+faker
+
+# Visualization
+plotly
+dash
+streamlit
+matplotlib
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Utilities
+python-dotenv
+requests
+jinja2
+aiofiles
+
+# Jupyter (for development)
+jupyter
+notebook

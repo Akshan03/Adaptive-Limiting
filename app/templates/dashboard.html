@@ -1,0 +1,214 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Adaptive API Rate Limiter Dashboard</title>
+            <meta http-equiv="refresh" content="5">
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }
+                .container {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }
+                .chart-container {
+                    background-color: white;
+                    border-radius: 5px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                    padding: 15px;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+                h1 {
+                    color: #333;
+                }
+                .stats-container {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 20px;
+                }
+                .stat-box {
+                    background-color: white;
+                    border-radius: 5px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                    padding: 15px;
+                    flex: 1;
+                    margin: 0 10px;
+                    text-align: center;
+                }
+                .stat-box h3 {
+                    margin-top: 0;
+                    color: #555;
+                }
+                .stat-value {
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #0066cc;
+                }
+                .anomaly-alert {
+                    background-color: #ffebee;
+                    color: #c62828;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-bottom: 20px;
+                    display: none;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Adaptive API Rate Limiter Dashboard</h1>
+                    <p>Last updated: <span id="update-time">{{ current_time }}</span></p>
+                </div>
+                
+                <div id="anomaly-alert" class="anomaly-alert">
+                    <strong>Alert:</strong> Anomalous traffic detected! Applying defensive rate limiting.
+                </div>
+                
+                <div class="stats-container">
+                    <div class="stat-box">
+                        <h3>Active Users</h3>
+                        <div class="stat-value">{{ stats.active_users }}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Requests (Last 30m)</h3>
+                        <div class="stat-value">{{ stats.request_count }}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Predicted Traffic</h3>
+                        <div class="stat-value">{{ stats.latest_prediction|default('N/A', true) }}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Traffic Level</h3>
+                        <div class="stat-value" id="traffic-level">Medium</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <h2>Token Bucket Status by User Tier</h2>
+                    <div id="token-chart" style="height: 400px;"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <h2>Traffic Prediction & Anomaly Detection</h2>
+                    <div id="traffic-chart" style="height: 400px;"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <h2>Rate Limit Configuration</h2>
+                    <div id="config-chart" style="height: 300px;"></div>
+                </div>
+            </div>
+            
+            <script>
+                // Token Bucket Chart
+                var tokenData = {{ token_data|safe }};
+                
+                var tokenChart = Plotly.newPlot('token-chart', [{
+                    type: 'bar',
+                    x: tokenData.tiers,
+                    y: tokenData.used_tokens,
+                    name: 'Used Tokens',
+                    marker: {color: '#ff7f0e'}
+                }, {
+                    type: 'bar',
+                    x: tokenData.tiers,
+                    y: tokenData.available_tokens,
+                    name: 'Available Tokens',
+                    marker: {color: '#1f77b4'}
+                }], {
+                    barmode: 'stack',
+                    yaxis: {title: 'Tokens'},
+                    xaxis: {title: 'User Tier'}
+                });
+                
+                // Traffic Chart
+                var trafficData = {{ traffic_data|safe }};
+                
+                var trafficChart = Plotly.newPlot('traffic-chart', [{
+                    type: 'scatter',
+                    x: trafficData.timestamps,
+                    y: trafficData.requests,
+                    name: 'Actual Requests',
+                    mode: 'lines+markers'
+                }, {
+                    type: 'scatter',
+                    x: trafficData.prediction_timestamps,
+                    y: trafficData.predictions,
+                    name: 'Predicted Traffic',
+                    mode: 'lines',
+                    line: {dash: 'dot', color: 'blue'}
+                }, {
+                    type: 'scatter',
+                    x: trafficData.anomaly_timestamps,
+                    y: trafficData.anomaly_points,
+                    name: 'Anomalies',
+                    mode: 'markers',
+                    marker: {
+                        size: 10,
+                        color: 'red',
+                        symbol: 'x'
+                    }
+                }], {
+                    yaxis: {title: 'Request Count'},
+                    xaxis: {title: 'Time'}
+                });
+                
+                // Config Chart
+                var configData = {{ config_data|safe }};
+                
+                var configChart = Plotly.newPlot('config-chart', [{
+                    type: 'bar',
+                    x: configData.tiers,
+                    y: configData.capacity,
+                    name: 'Bucket Capacity',
+                    marker: {color: '#2ca02c'}
+                }, {
+                    type: 'bar',
+                    x: configData.tiers,
+                    y: configData.refill_rate,
+                    name: 'Refill Rate (per min)',
+                    marker: {color: '#9467bd'}
+                }], {
+                    yaxis: {title: 'Value'},
+                    xaxis: {title: 'User Tier'},
+                    barmode: 'group'
+                });
+                
+                // Update traffic level
+                var latestPrediction = {{ stats.latest_prediction|default(0, true) }};
+                var trafficLevel = document.getElementById('traffic-level');
+                
+                if (latestPrediction < {{ settings.TRAFFIC_THRESHOLDS.low }}) {
+                    trafficLevel.textContent = 'Low';
+                    trafficLevel.style.color = '#2ca02c';
+                } else if (latestPrediction > {{ settings.TRAFFIC_THRESHOLDS.high }}) {
+                    trafficLevel.textContent = 'High';
+                    trafficLevel.style.color = '#d62728';
+                } else {
+                    trafficLevel.textContent = 'Medium';
+                    trafficLevel.style.color = '#ff7f0e';
+                }
+                
+                // Show anomaly alert if needed
+                var hasAnomaly = {{ 'true' if stats.has_anomaly else 'false' }};
+                var anomalyAlert = document.getElementById('anomaly-alert');
+                
+                if (hasAnomaly) {
+                    anomalyAlert.style.display = 'block';
+                }
+            </script>
+        </body>
+        </html>
+        
