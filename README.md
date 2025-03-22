@@ -127,9 +127,28 @@ adaptive-rate-limiter/
 
 ---
 
-## **How to Run the Project**
+## **Detailed Setup and Running Instructions**
 
-### Step 1: Install Dependencies
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/Akshan03/Adaptive-Limiting.git
+cd Adaptive-Limiting
+```
+
+### Step 2: Set Up Virtual Environment (Recommended)
+
+```bash
+# For Windows
+python -m venv venv
+venv\Scripts\activate
+
+# For macOS/Linux
+python -m venv venv
+source venv/bin/activate
+```
+
+### Step 3: Install Dependencies
 
 Install all required libraries using `requirements.txt`:
 
@@ -137,11 +156,7 @@ Install all required libraries using `requirements.txt`:
 pip install -r requirements.txt
 ```
 
-Ensure Python version is `3.11.9`.
-
----
-
-### Step 2: Generate Synthetic Data
+### Step 4: Generate Synthetic Data
 
 Run the `traffic.py` script to generate synthetic API request data:
 
@@ -149,23 +164,33 @@ Run the `traffic.py` script to generate synthetic API request data:
 python data/traffic.py
 ```
 
-This creates a CSV file at `data/synthetic_api_traffic.csv`.
+This will create a file at `data/synthetic_api_traffic.csv` with:
+- Simulated API requests spread over various timestamps
+- Different user tiers (STD/PRM)
+- Response codes and latency values
+- Simulated malicious traffic
 
----
+### Step 5: Train Machine Learning Models
 
-### Step 3: Train AI Models
-
-Train the LSTM and Isolation Forest models using the synthetic data:
+Train both the LSTM and Isolation Forest models using the synthetic data:
 
 ```bash
 python scripts/train_models.py
 ```
 
-This saves the trained models to `app/models/trained/`.
+This process:
+- Trains an LSTM model to predict future traffic based on historical patterns
+- Trains an Isolation Forest model to detect anomalous API usage
+- Saves the trained models to `app/models/trained/`
+- Generates visualizations of the training results in the `plots/` directory
 
----
+Alternatively, if you want to train a model with smaller sequence length (for quicker predictions):
 
-### Step 4: Start FastAPI Server
+```bash
+python scripts/retrain_lstm.py
+```
+
+### Step 6: Start the API Server
 
 Start the FastAPI application:
 
@@ -173,68 +198,171 @@ Start the FastAPI application:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The server will be accessible at `http://127.0.0.1:8000`.
+The API server will be accessible at `http://localhost:8000` with these endpoints:
+- API Documentation: `http://localhost:8000/docs`
+- `/api/test`: Basic test endpoint subject to rate limiting
+- `/api/browse`: Endpoint for browsing resources
+- `/api/payment-gateway`: Premium endpoint (higher priority)
+- `/api/admin/metrics`: Get current traffic metrics
+- `/api/admin/update-tier`: Update rate limit configurations dynamically
 
----
+### Step 7: Launch the Dashboard (Optional)
 
-### Step 5: Simulate Real-Time Traffic
-
-Generate real-time API requests using `simulate_requests.py`:
+In a separate terminal, start the Streamlit dashboard:
 
 ```bash
-python scripts/simulate_requests.py --rate 50 --pattern spike --duration 300
+streamlit run dashboard/app.py
 ```
 
-You can also use tools like Postman or Apache JMeter for load testing.
+The dashboard will be accessible at `http://localhost:8501` and displays:
+- Current active users and request counts
+- Token bucket status for different user tiers
+- Traffic predictions and anomaly detection results
+- Visual indicators for traffic levels and system status
 
 ---
 
-### Step 6: Access Dashboard
+## **Testing the System**
 
-Open your browser and navigate to:
+### Basic Testing
 
+You can test the API with simple curl commands:
+
+```bash
+# Make a test request (no rate limiting initially)
+curl -X GET "http://localhost:8000/api/test?user_id=user123&user_tier=STD"
+
+# Make multiple requests to trigger rate limiting
+for i in {1..100}; do curl -X GET "http://localhost:8000/api/test?user_id=user123&user_tier=STD"; done
 ```
-http://127.0.0.1:8000/dashboard
+
+### Simulating Different Traffic Patterns
+
+The system includes a request simulator to test various traffic patterns:
+
+```bash
+# Simulate normal traffic (10 requests per second for 60 seconds)
+python scripts/simulate_requests.py --rate=10 --duration=60
+
+# Simulate traffic spike (starts at 20 req/sec and spikes to 100 req/sec)
+python scripts/simulate_requests.py --pattern=spike --rate=20 --duration=120
+
+# Simulate wave pattern (traffic oscillates between low and high)
+python scripts/simulate_requests.py --pattern=wave --rate=30 --duration=180
+
+# Simulate malicious traffic (includes attack patterns)
+python scripts/simulate_requests.py --pattern=random --malicious --duration=120
 ```
 
-The dashboard will display:
-1. Active users and request counts.
-2. Token bucket statuses by user tier (STD vs PRM).
-3. Predicted vs actual traffic trends.
-4. Anomaly scores over time.
+### Testing Anomaly Detection
 
----
+To test the anomaly detection system:
 
-### Step 7: Test Endpoints
+1. Start with normal traffic:
+```bash
+python scripts/simulate_requests.py --rate=20 --duration=60
+```
 
-Use Swagger UI at `http://127.0.0.1:8000/docs` to test individual endpoints:
-1. `/api/test`: Simulates a test request subject to rate limiting.
-2. `/api/admin/update-tier`: Updates token bucket configurations dynamically.
+2. Then suddenly increase to a spike:
+```bash
+python scripts/simulate_requests.py --pattern=spike --rate=50 --malicious --duration=120
+```
 
----
+3. Watch the logs or dashboard to observe:
+   - Detection of the traffic spike
+   - Anomaly score calculation
+   - Adaptive rate limit adjustments
+   - Recovery after the spike ends
 
-## **Key Features of Dashboard**
-1. Real-time visualization of token bucket statuses (available vs used tokens).
-2. Graph of predicted vs actual traffic trends using LSTM model outputs.
-3. Scatter plot of anomaly scores over time from Isolation Forest detections.
+### Testing Dynamic Rate Adjustments
 
----
+To test how the system adapts to different traffic levels:
 
-## **Testing**
-Run unit tests for rate limiter functionality and AI models:
+1. Generate low traffic and observe the rate limits:
+```bash
+python scripts/simulate_requests.py --rate=5 --duration=120
+```
+
+2. Generate medium traffic:
+```bash
+python scripts/simulate_requests.py --rate=40 --duration=120
+```
+
+3. Generate high traffic:
+```bash
+python scripts/simulate_requests.py --rate=80 --duration=120
+```
+
+For each level, observe in the logs or dashboard:
+- How token bucket capacities are adjusted
+- Different treatment of STD vs PRM users
+- LSTM predictions for future traffic
+
+### Running Automated Tests
+
+Execute the automated test suite to validate core functionality:
 
 ```bash
 pytest tests/
 ```
 
-This ensures that:
-1. Token bucket algorithm behaves correctly under different scenarios.
-2. LSTM predictions align with expected trends in synthetic data.
-3. Isolation Forest detects anomalies accurately.
+These tests verify:
+- Token bucket algorithm correctness
+- Rate limiting middleware behavior
+- Model prediction accuracy
+- System response to anomalies
+
+---
+
+## **Monitoring and Troubleshooting**
+
+### Logs
+
+Application logs are stored in the `logs/` directory, providing detailed information about:
+- Request processing
+- Rate limit decisions
+- Traffic predictions
+- Anomaly detections
+- System adaptations
+
+View recent logs with:
+```bash
+tail -f logs/app.log
+```
+
+### Performance Metrics
+
+Monitor system performance via the admin metrics endpoint:
+```bash
+curl -X GET "http://localhost:8000/api/admin/metrics"
+```
+
+The dashboard also provides visual indicators of system performance and rate limit effectiveness.
+
+---
+
+## **Configuration**
+
+Key configuration settings are in `app/core/config.py`, including:
+
+- Token bucket parameters for different user tiers
+- Traffic thresholds for low/medium/high classification
+- Rate limit adjustment factors
+- Monitoring intervals
+- Model paths
+
+For quick adjustments without modifying code, use the admin endpoint:
+```bash
+curl -X POST "http://localhost:8000/api/admin/update-tier" \
+  -H "Content-Type: application/json" \
+  -d '{"tier": "STD", "capacity": 60, "refill_tokens": 12, "refill_duration": 60}'
+```
 
 ---
 
 ## **Future Improvements**
 1. Integrate more advanced anomaly detection techniques like DBSCAN or Autoencoders.
 2. Add support for live retraining of models based on real-time feedback loops.
-3. Improve visualization with interactive charts in Streamlit or Dash. 
+3. Improve visualization with interactive charts in Streamlit or Dash.
+4. Implement distributed rate limiting using Redis for multi-server deployments.
+5. Add user authentication and role-based access for admin controls.
