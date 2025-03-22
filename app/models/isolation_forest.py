@@ -140,7 +140,13 @@ class AnomalyDetector:
         """
         if self.model is None:
             logger.error("Model not initialized")
-            return None, None
+            return False, 0
+        
+        # Validate feature dimensions if feature_columns is defined
+        EXPECTED_FEATURES = len(self.feature_columns) if self.feature_columns else None
+        if EXPECTED_FEATURES and isinstance(data_point, list) and len(data_point) != EXPECTED_FEATURES:
+            logger.error(f"Feature dimension mismatch. Expected {EXPECTED_FEATURES}, got {len(data_point)}")
+            return False, 0
         
         # Convert to numpy array with shape (1, n_features)
         if isinstance(data_point, pd.DataFrame):
@@ -154,6 +160,11 @@ class AnomalyDetector:
         else:
             X = data_point.reshape(1, -1)
         
+        # Additional dimension validation after conversion
+        if EXPECTED_FEATURES and X.shape[1] != EXPECTED_FEATURES:
+            logger.error(f"Feature dimension mismatch after conversion. Expected {EXPECTED_FEATURES}, got {X.shape[1]}")
+            return False, 0
+            
         # Get prediction and score
         prediction = self.model.predict(X)[0]
         anomaly_score = -self.model.score_samples(X)[0]

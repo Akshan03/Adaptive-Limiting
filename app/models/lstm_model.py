@@ -25,7 +25,8 @@ class TrafficPredictor:
         """
         self.model = None
         self.scaler = None
-        self.sequence_length = 10  # Number of time steps to consider
+        self.sequence_length = 5  # Reduced from 10 to 5
+        self.historical_data = []  # Store historical data for accumulation
         
         # Load pre-trained model if paths provided
         if model_path and os.path.exists(model_path):
@@ -148,27 +149,40 @@ class TrafficPredictor:
             logger.error("Model or scaler not initialized")
             return None
         
-        # Ensure we have enough data points
-        if len(recent_data) < self.sequence_length:
-            logger.warning(f"Not enough data for prediction. Need {self.sequence_length} points.")
+        # Add the new data points to our historical record
+        if isinstance(recent_data, list):
+            self.historical_data.extend(recent_data)
+        else:
+            self.historical_data.extend(recent_data.tolist())
+        
+        # Keep only the most recent data points
+        self.historical_data = self.historical_data[-30:]  # Keep at most 30 points
+        
+        # Check if we have enough data points now
+        if len(self.historical_data) < self.sequence_length:
+            logger.warning(f"Not enough historical data for prediction. Have {len(self.historical_data)}, need {self.sequence_length}.")
             return None
         
-        # Take the last sequence_length data points
-        recent_data = np.array(recent_data[-self.sequence_length:]).reshape(-1, 1)
-        
-        # Scale the data
-        scaled_data = self.scaler.transform(recent_data)
-        
-        # Reshape for LSTM [samples, time steps, features]
-        X = scaled_data.reshape(1, self.sequence_length, 1)
-        
-        # Make prediction
-        scaled_prediction = self.model.predict(X, verbose=0)
-        
-        # Inverse transform to get actual prediction
-        prediction = self.scaler.inverse_transform(scaled_prediction)[0, 0]
-        
-        return prediction
+        try:
+            # Take the last sequence_length data points
+            recent_data = np.array(self.historical_data[-self.sequence_length:]).reshape(-1, 1)
+            
+            # Scale the data
+            scaled_data = self.scaler.transform(recent_data)
+            
+            # Reshape for LSTM [samples, time steps, features]
+            X = scaled_data.reshape(1, self.sequence_length, 1)
+            
+            # Make prediction
+            scaled_prediction = self.model.predict(X, verbose=0)
+            
+            # Inverse transform to get actual prediction
+            prediction = self.scaler.inverse_transform(scaled_prediction)[0, 0]
+            
+            return prediction
+        except Exception as e:
+            logger.error(f"Error during prediction: {str(e)}")
+            return None
     
     def save(self, model_path: str, scaler_path: str) -> None:
         """

@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ISOLATION_FOREST_PATH: str = os.path.join(MODEL_DIR, "isolation_forest.pkl")
     
     # Traffic monitoring settings
-    MONITORING_INTERVAL: int = 60  # Check traffic every 60 seconds
+    MONITORING_INTERVAL: int = 30  # Check traffic every 30 seconds (reduced from 60)
     TRAFFIC_WINDOW: int = 1800     # Use 30 minutes of data for analysis
     
     # Traffic thresholds for different levels

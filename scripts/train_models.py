@@ -172,7 +172,7 @@ def train_isolation_forest(feature_data):
     training_result = anomaly_model.train(
         data=feature_data,
         feature_columns=feature_columns,
-        contamination=0.05  # Approximately 5% of data is anomalous
+        contamination=0.02  # Reduced from 0.05 (5%) to 0.02 (2%) to be less sensitive
     )
     
     logger.info(f"Isolation Forest training complete:")
@@ -211,12 +211,13 @@ def train_isolation_forest(feature_data):
     return anomaly_model
 
 def main():
-    """Main function to train and save models"""
-    # Ensure models directory exists
-    os.makedirs(settings.MODEL_DIR, exist_ok=True)
+    """
+    Main function to train and save the models
+    """
+    # Use absolute path for data file
+    data_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), settings.SYNTHETIC_DATA_PATH)
     
-    # Load and preprocess data
-    traffic_counts, feature_data = load_and_preprocess_data(settings.SYNTHETIC_DATA_PATH)
+    traffic_counts, feature_data = load_and_preprocess_data(data_path)
     
     # Train LSTM model
     lstm_model = train_lstm_model(traffic_counts)
